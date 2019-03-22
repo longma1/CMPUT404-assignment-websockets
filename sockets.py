@@ -26,6 +26,8 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+queues=[]
+
 class World:
     def __init__(self):
         self.clear()
@@ -43,6 +45,7 @@ class World:
 
     def set(self, entity, data):
         self.space[entity] = data
+        print('adding:',entity)
         self.update_listeners( entity )
 
     def update_listeners(self, entity):
@@ -63,17 +66,36 @@ myWorld = World()
 
 def set_listener( entity, data ):
     ''' do something with the update ! '''
+    package={entity:data}
+    load=json.dumps(package)
+    for queue in queues:
+        queue.put(load)
+        
+    
+    
 
 myWorld.add_set_listener( set_listener )
         
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return flash.redirect('/static/index.html')
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
+    try:
+        while True:
+            msg=ws.receive()
+            if (msg is not None):
+                load_json=json.loads(msg)
+                entity=list(load_json.keys())[0]
+                value=load_json[entity]
+                myWorld.set(entity,value)
+            else:
+                break
+    except Exception as e:
+        print(e)
     return None
 
 @sockets.route('/subscribe')
@@ -81,7 +103,18 @@ def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
-    return None
+    usr_queue=queue.Queue()
+    queues.append(usr_queue)
+    g=gevent.spawn(read_ws, ws, usr_queue)
+    try:
+        while True:
+            msg=usr_queue.get()
+            ws.send(msg)
+            
+    except Exception as e:
+        print(e)
+    myWorld.listeners.remove(usr_queue)
+    gevent.kill(g)
 
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
@@ -114,6 +147,7 @@ def get_entity(entity):
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
+    myWorld.clear()
     '''Clear the world out!'''
     return None
 
