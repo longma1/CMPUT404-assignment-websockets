@@ -79,7 +79,7 @@ myWorld.add_set_listener( set_listener )
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return flash.redirect('/static/index.html')
+    return flask.redirect('/static/index.html')
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
@@ -129,28 +129,49 @@ def flask_post_json():
     else:
         return json.loads(request.form.keys()[0])
 
+
+#I think these are the same as assignment #4 so I'll try and just
+#get copy and paste what I wrote last time?
+# I dont think they will be used but might as well
+
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    parcel=flask_post_json()
+    return_dict={}
+    
+    myWorld.set(entity,parcel)
+    return_json=json.dumps(parcel)
+    response= app.response_class(response=return_json,mimetype='application/json')
+    return response
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    entire_world=json.dumps(myWorld.world())
+    encoded_world=entire_world.encode('utf-8')
+	
+    response= app.response_class(response=entire_world,mimetype='application/json')
+
+    return response
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    desired_entity=json.dumps(myWorld.get(entity))
+    if len(desired_entity)>0:
+        encoded_entity=desired_entity.encode('utf-8')
+        response=app.response_class(response=desired_entity, mimetype='application/json')
+        return response
+    #i guess return a 404 if entity does not exist?
+    return flask.abort(404)
 
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     myWorld.clear()
     '''Clear the world out!'''
-    return None
-
+    return "Ok"
 
 
 if __name__ == "__main__":
